@@ -1,0 +1,5 @@
+vizdoom>=1.2.4
+typesafe-sdk
+google-genai
+rich
+numpy
