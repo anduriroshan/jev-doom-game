@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.table import Table
 from rich import box
 
-from config import ACTION_LIST, COST_PER_1M_INPUT, COST_PER_1M_OUTPUT, DEFAULT_SCENARIO
+from config import ACTION_LIST, COST_PER_1M_INPUT, COST_PER_1M_OUTPUT, DEFAULT_SCENARIO, RECORDINGS_DIR
 from game_loop import create_game, run_episode
 from display import print_episode_summary
 
@@ -217,7 +217,7 @@ def print_comparison_table(jev_metrics, gemini_metrics, scenario=DEFAULT_SCENARI
     console.print()
 
 
-def run_benchmark(num_episodes=3, visible=True, scenario=DEFAULT_SCENARIO):
+def run_benchmark(num_episodes=3, visible=True, scenario=DEFAULT_SCENARIO, record_video=False):
     """
     Run a full A/B benchmark comparing Jev and Gemini.
 
@@ -225,6 +225,7 @@ def run_benchmark(num_episodes=3, visible=True, scenario=DEFAULT_SCENARIO):
         num_episodes: number of episodes to run per backend
         visible: whether to show the ViZDoom window
         scenario: scenario name ("defend_the_center", "basic", "deadly_corridor")
+        record_video: whether to record smooth 35 FPS MP4 video replays
 
     Returns:
         (jev_metrics, gemini_metrics) tuple of aggregated metric dicts
@@ -245,10 +246,13 @@ def run_benchmark(num_episodes=3, visible=True, scenario=DEFAULT_SCENARIO):
         for ep_num in range(1, num_episodes + 1):
             console.print(f"[dim]  Episode {ep_num}/{num_episodes}...[/]")
 
-            ep_result = run_episode(game, backend)
+            video_file = os.path.join(RECORDINGS_DIR, f"{backend_name}_{scenario}_ep{ep_num}.mp4") if record_video else None
+            ep_result = run_episode(game, backend, record_video=record_video, video_path=video_file)
             episodes.append(ep_result)
 
             print_episode_summary(ep_result, backend_name, ep_num)
+            if ep_result.get("video_path"):
+                console.print(f"  [bright_green]🎥 Replay saved:[/] [cyan]{ep_result['video_path']}[/]\n")
 
         results[backend_name] = episodes
         backend.cleanup()

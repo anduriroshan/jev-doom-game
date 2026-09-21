@@ -23,8 +23,10 @@ AVAILABLE_SCENARIOS = {
 
 SCREEN_WIDTH = 640
 SCREEN_HEIGHT = 480
+DEFAULT_FPS = 35        # Classic Doom native engine ticrate (35 FPS)
 FRAME_SKIP = 4          # ViZDoom runs action for N internal frames per AI tick
 EPISODE_TIMEOUT = 150   # Max decisions per episode (150 decisions * 4 = 600 engine tics ≈ 17s)
+RECORDINGS_DIR = "recordings"
 
 # Available actions: maps action name → ViZDoom button vector
 # Order must match buttons added in game setup:

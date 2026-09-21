@@ -10,6 +10,7 @@ import vizdoom as vzd
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FRAME_SKIP, EPISODE_TIMEOUT,
     ACTION_MAP, ACTION_LIST, DEFAULT_SCENARIO, AVAILABLE_SCENARIOS,
+    DEFAULT_FPS,
 )
 from state_translator import translate_state
 
@@ -76,31 +77,23 @@ def create_game(scenario=DEFAULT_SCENARIO, visible=True):
     return game
 
 
-def run_episode(game, backend, display_callback=None):
+def run_episode(game, backend, display_callback=None, record_video=False, video_path=None, frame_skip=FRAME_SKIP):
     """
     Run a single episode of Doom using the given AI backend.
 
     Args:
         game: Initialized ViZDoom game instance.
         backend: Module with get_action(state_json) → dict function.
-        display_callback: Optional function called each tick with
-                          (tick_data, cumulative_metrics) for live display.
+        display_callback: Optional function called each tick for live display.
+        record_video: If True, capture all intermediate frames and save a smooth MP4.
+        video_path: File path to save the MP4 video replay.
+        frame_skip: Number of engine tics per AI decision.
 
     Returns:
-        dict with episode-level metrics:
-            ticks (int): number of AI decisions made
-            total_reward (float): cumulative game reward
-            kill_count (int): enemies killed
-            survival_ticks (int): ticks the player survived
-            final_health (int): health at end of episode
-            latencies (list[float]): per-tick latency in ms
-            input_tokens_total (int): total input tokens consumed
-            output_tokens_total (int): total output tokens produced
-            actions (list[str]): per-tick action chosen
-            confidences (list[float]): per-tick confidence
-            errors (int): number of API errors
-            tick_data (list[dict]): full per-tick data for detailed analysis
+        dict with episode-level metrics + video_path.
     """
+    import random
+    game.set_seed(random.randint(1, 10_000_000))
     game.new_episode()
 
     # ── Accumulators ──
@@ -108,6 +101,7 @@ def run_episode(game, backend, display_callback=None):
     latencies = []
     actions = []
     confidences = []
+    video_frames = []
     input_tokens_total = 0
     output_tokens_total = 0
     total_reward = 0.0
@@ -131,8 +125,19 @@ def run_episode(game, backend, display_callback=None):
             action_name = "MOVE_FORWARD"
         action_vector = ACTION_MAP[action_name]
 
-        # ── Execute action ──
-        reward = game.make_action(action_vector, FRAME_SKIP)
+        # ── Execute action with smooth frame capture ──
+        if record_video:
+            reward = 0.0
+            for _ in range(frame_skip):
+                if game.is_episode_finished():
+                    break
+                r = game.make_action(action_vector, 1)
+                reward += r
+                st = game.get_state()
+                if st and st.screen_buffer is not None:
+                    video_frames.append(st.screen_buffer)
+        else:
+            reward = game.make_action(action_vector, frame_skip)
         total_reward += reward
 
         # ── Track metrics ──
@@ -184,6 +189,17 @@ def run_episode(game, backend, display_callback=None):
     except Exception:
         final_health = 0
 
+    # ── Save smooth 35 FPS video if recorded ──
+    saved_video = None
+    if record_video and video_frames and video_path:
+        try:
+            import imageio  # type: ignore
+            os.makedirs(os.path.dirname(os.path.abspath(video_path)), exist_ok=True)
+            imageio.mimsave(video_path, video_frames, fps=DEFAULT_FPS)
+            saved_video = video_path
+        except Exception as e:
+            print(f"[Warning] Failed to save video: {e}")
+
     return {
         "ticks": tick,
         "total_reward": total_reward,
@@ -197,4 +213,5 @@ def run_episode(game, backend, display_callback=None):
         "confidences": confidences,
         "errors": errors,
         "tick_data": tick_data_list,
+        "video_path": saved_video,
     }

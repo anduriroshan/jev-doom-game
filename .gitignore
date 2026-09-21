@@ -1,0 +1,42 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables
+.env
+.env.local
+
+# ViZDoom local runtime config
+_vizdoom.ini
+vizdoom.ini
+
+# Gameplay recordings (keep directory structure via .gitkeep)
+recordings/*.mp4
+recordings/*.webm
+recordings/*.gif
+!recordings/.gitkeep
+
+# Benchmark results
+benchmark_results.json
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating System files
+.DS_Store
+Thumbs.db

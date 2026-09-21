@@ -27,7 +27,7 @@ from rich.panel import Panel
 from rich.live import Live
 from rich import box
 
-from config import DEFAULT_EPISODES, DEFAULT_BACKEND, DEFAULT_SCENARIO, AVAILABLE_SCENARIOS
+from config import DEFAULT_EPISODES, DEFAULT_BACKEND, DEFAULT_SCENARIO, AVAILABLE_SCENARIOS, RECORDINGS_DIR
 from game_loop import create_game, run_episode
 from display import create_tick_display, print_episode_summary, console
 
@@ -61,7 +61,7 @@ def get_backend(name):
         sys.exit(1)
 
 
-def run_single(backend_name, num_episodes=1, visible=True, live_display=True, scenario=DEFAULT_SCENARIO):
+def run_single(backend_name, num_episodes=1, visible=True, live_display=True, scenario=DEFAULT_SCENARIO, record_video=False):
     """Run episodes with a single backend."""
     backend = get_backend(backend_name)
     game = create_game(scenario=scenario, visible=visible)
@@ -70,17 +70,20 @@ def run_single(backend_name, num_episodes=1, visible=True, live_display=True, sc
     console.print(f"\n[bold]Running {num_episodes} episode(s) with [bright_cyan]{backend_name.upper()}[/] on [yellow]{scenario}[/]...\n")
 
     for ep_num in range(1, num_episodes + 1):
+        video_file = os.path.join(RECORDINGS_DIR, f"{backend_name}_{scenario}_ep{ep_num}.mp4") if record_video else None
         if live_display:
             with Live(console=console, refresh_per_second=10, transient=True) as live:
                 def display_cb(tick_data, cumulative):
                     panel = create_tick_display(tick_data, cumulative, backend_name)
                     live.update(panel)
 
-                result = run_episode(game, backend, display_callback=display_cb)
+                result = run_episode(game, backend, display_callback=display_cb, record_video=record_video, video_path=video_file)
         else:
-            result = run_episode(game, backend)
+            result = run_episode(game, backend, record_video=record_video, video_path=video_file)
 
         print_episode_summary(result, backend_name, ep_num)
+        if result.get("video_path"):
+            console.print(f"  [bright_green]🎥 Replay saved:[/] [cyan]{result['video_path']}[/]\n")
 
     backend.cleanup()
     game.close()
@@ -134,6 +137,11 @@ Examples:
         action="store_true",
         help="Disable the Rich live terminal display",
     )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Record smooth 35 FPS MP4 video replay of gameplay without network lag",
+    )
 
     args = parser.parse_args()
 
@@ -144,7 +152,7 @@ Examples:
         # ── A/B Benchmark mode ──
         console.print(Panel(
             f"[bold]Running A/B benchmark: [bright_green]Jev[/] vs [bright_yellow]Gemini Flash[/]\n"
-            f"[dim]Scenario: {args.scenario} | Episodes per backend: {args.episodes}[/]",
+            f"[dim]Scenario: {args.scenario} | Episodes per backend: {args.episodes} | Recording: {'Yes (35 FPS)' if args.record else 'No'}[/]",
             border_style="bright_cyan",
             box=box.DOUBLE,
         ))
@@ -154,6 +162,7 @@ Examples:
             num_episodes=args.episodes,
             visible=not args.headless,
             scenario=args.scenario,
+            record_video=args.record,
         )
     else:
         # ── Single backend mode ──
@@ -163,6 +172,7 @@ Examples:
             visible=not args.headless,
             live_display=not args.no_display,
             scenario=args.scenario,
+            record_video=args.record,
         )
 
     console.print("\n[bold bright_green]✓ Done![/]\n")
